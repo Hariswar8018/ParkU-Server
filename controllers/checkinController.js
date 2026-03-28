@@ -1,9 +1,9 @@
 const db = require("../db");
+const cloudinary = require("../config/cloudinary");
 
 exports.createCheckin = async (req, res) => {
   try {
     const {
-      pic,
       starttime,
       endtime,
       out,
@@ -14,15 +14,76 @@ exports.createCheckin = async (req, res) => {
       location
     } = req.body;
 
-    const [result] = await db.query(
-      `INSERT INTO checkins 
-      (pic, starttime, endtime, out_status, phonenumber, name, carnumber, gatekeeperuid, location)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [pic, starttime, endtime, out, phonenumber, name, carnumber, gatekeeperuid, location]
-    );
+    let imageUrl = "";
 
-    res.json({ message: "Check-in created", id: result.insertId });
+    // 🔥 Upload image if exists
+    if (req.file) {
+      const result = await cloudinary.uploader.upload_stream(
+        { folder: "checkins" },
+        async (error, result) => {
+          if (error) {
+            return res.status(500).json({ error: error.message });
+          }
+
+          imageUrl = result.secure_url;
+
+          // Save in DB after upload
+          const [dbResult] = await db.query(
+            `INSERT INTO checkins 
+            (pic, starttime, endtime, out_status, phonenumber, name, carnumber, gatekeeperuid, location)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              imageUrl,
+              starttime,
+              endtime,
+              out,
+              phonenumber,
+              name,
+              carnumber,
+              gatekeeperuid,
+              location,
+            ]
+          );
+
+          return res.json({
+            message: "Check-in created",
+            id: dbResult.insertId,
+            pic: imageUrl,
+          });
+        }
+      );
+
+      // convert buffer to stream
+      const stream = result;
+      stream.end(req.file.buffer);
+
+    } else {
+      // No image case
+      const [dbResult] = await db.query(
+        `INSERT INTO checkins 
+        (pic, starttime, endtime, out_status, phonenumber, name, carnumber, gatekeeperuid, location)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          "",
+          starttime,
+          endtime,
+          out,
+          phonenumber,
+          name,
+          carnumber,
+          gatekeeperuid,
+          location,
+        ]
+      );
+
+      return res.json({
+        message: "Check-in created (no image)",
+        id: dbResult.insertId,
+      });
+    }
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
