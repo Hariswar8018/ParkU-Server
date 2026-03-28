@@ -1,6 +1,5 @@
 const db = require("../db");
 
-// CREATE check-in
 exports.createCheckin = async (req, res) => {
   try {
     const {
@@ -28,12 +27,13 @@ exports.createCheckin = async (req, res) => {
   }
 };
 
-// FETCH all check-ins
 exports.getCheckins = async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM checkins ORDER BY starttime DESC");
     res.json(rows);
   } catch (err) {
+    console.error("DB ERROR:", err); // 👈 add this
     res.status(500).json({ error: err.message });
+    
   }
 };
